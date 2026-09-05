@@ -1,0 +1,102 @@
+name: auto-update-core
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CORE_REPO: Jolymmiles/Xray-core
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve latest Xray core release
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${CORE_REPO}/releases/latest" | jq -r .tag_name)
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::Failed to resolve latest release of ${CORE_REPO}"
+            exit 1
+          fi
+          BASE="${TAG%%-*}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "Latest ${CORE_REPO} release: ${TAG}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare with pinned version
+        id: check
+        env:
+          LATEST_TAG: ${{ steps.latest.outputs.tag }}
+          LATEST_BASE: ${{ steps.latest.outputs.base }}
+        run: |
+          CURRENT=$(grep -A3 'xray_core_version:' .github/workflows/build.yml \
+            | grep -oP '(?<=default: ")[^"]+')
+          CURRENT_BASE="${CURRENT%%-*}"
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+          echo "Pinned core: ${CURRENT}"
+          if [ "${CURRENT_BASE}" = "${LATEST_BASE}" ]; then
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Already on latest core base (${LATEST_BASE}), nothing to do."
+            exit 0
+          fi
+          NEWER=$(printf '%s\n%s\n' "${CURRENT_BASE}" "${LATEST_BASE}" | sort -V | tail -1)
+          if [ "${NEWER}" = "${LATEST_BASE}" ]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "Update available: ${CURRENT} -> ${LATEST_TAG}"
+          else
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Latest release (${LATEST_TAG}) is older than pinned ${CURRENT}, skipping."
+          fi
+
+      - name: Pin new core version and trigger rebuild
+        if: steps.check.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          sed -i "s/${{ steps.check.outputs.current }}/${NEW_TAG}/g" \
+            .github/workflows/build.yml README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/build.yml README.md
+          git commit -m "core: auto-update Xray -> ${NEW_TAG}"
+          git push origin main
+          # GITHUB_TOKEN push не триггерит workflows, поэтому пересборку запускаем явно
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build.yml/dispatches" \
+            -d "{\"ref\":\"main\",\"inputs\":{\"xray_core_version\":\"${NEW_TAG}\"}}"
+          echo "Rebuild dispatched with core ${NEW_TAG}"
+
+      - name: Wait for image build
+        if: steps.check.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          CONCLUSION="unknown"
+          for i in $(seq 1 30); do
+            sleep 60
+            RUN=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build.yml/runs?head_sha=${SHA}&per_page=1")
+            STATUS=$(echo "$RUN" | jq -r '.workflow_runs[0].status // "pending"')
+            CONCLUSION=$(echo "$RUN" | jq -r '.workflow_runs[0].conclusion // "pending"')
+            echo "attempt ${i}: status=${STATUS} conclusion=${CONCLUSION}"
+            [ "${STATUS}" = "completed" ] && break
+          done
+          echo "build_conclusion=${CONCLUSION}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${CONCLUSION}" != "success" ]; then
+            echo "::warning::Image build did not succeed (conclusion=${CONCLUSION})"
+          fi

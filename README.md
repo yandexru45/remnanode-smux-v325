@@ -29,3 +29,12 @@ UPSTREAM_REPO=Jolymmiles
 ## Пересборка
 
 Actions → build-image → Run workflow: можно указать другой тег ноды или другую версию ядра.
+
+## Автообновление ядра
+
+Workflow `auto-update-core` раз в сутки (06:23 UTC) проверяет последний релиз [Jolymmiles/Xray-core](https://github.com/Jolymmiles/Xray-core):
+
+- если вышла версия новее запиненной — сам обновляет пин в `build.yml`/README, коммитит и запускает пересборку образа;
+- если ядро уже актуально — ничего не делает.
+
+Ручной прогон проверки: Actions → auto-update-core → Run workflow.
