@@ -1,6 +1,6 @@
 # remnanode-smux · pinned build v3.2.5
 
-Копия ноды [legiz-ru/remnanode-smux](https://github.com/legiz-ru/remnanode-smux) версии **v3.2.5** со зафиксированной версией ядра **Xray v26.8.24** ([Jolymmiles/Xray-core](https://github.com/Jolymmiles/Xray-core)).
+Копия ноды [legiz-ru/remnanode-smux](https://github.com/legiz-ru/remnanode-smux) версии **v3.2.5** со зафиксированной версией ядра **Xray v26.9.5-0936** ([Jolymmiles/Xray-core](https://github.com/Jolymmiles/Xray-core)).
 
 Предназначено для панели версии **2.8.1**, где образы ноды 3.3.x не применяются.
 
@@ -8,7 +8,7 @@
 
 ```
 ghcr.io/yandexru45/remnanode-smux:v3.2.5-panel281
-ghcr.io/yandexru45/remnanode-smux:v3.2.5-xray26.8.24
+ghcr.io/yandexru45/remnanode-smux:v3.2.5-xray26.9.5-0936
 ```
 
 Платформы: `linux/amd64`, `linux/arm64`.
@@ -20,7 +20,7 @@ ghcr.io/yandexru45/remnanode-smux:v3.2.5-xray26.8.24
 GitHub Actions берёт официальный исходник апстрима на теге `v3.2.5` и меняет только build-args:
 
 ```
-XRAY_CORE_VERSION=v26.8.24
+XRAY_CORE_VERSION=v26.9.5-0936
 UPSTREAM_REPO=Jolymmiles
 ```
 

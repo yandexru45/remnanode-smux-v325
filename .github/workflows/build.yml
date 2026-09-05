@@ -10,7 +10,7 @@ on:
       xray_core_version:
         description: "Xray core version"
         required: false
-        default: "v26.8.24"
+        default: "v26.9.5-0936"
   push:
     branches: [main]
 
@@ -20,7 +20,7 @@ permissions:
 
 env:
   NODE_TAG: ${{ github.event.inputs.node_tag || 'v3.2.5' }}
-  XRAY_CORE_VERSION: ${{ github.event.inputs.xray_core_version || 'v26.8.24' }}
+  XRAY_CORE_VERSION: ${{ github.event.inputs.xray_core_version || 'v26.9.5-0936' }}
 
 jobs:
   build:
